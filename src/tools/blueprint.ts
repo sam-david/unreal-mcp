@@ -1,8 +1,39 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { ConnectionManager } from "../transports/connection-manager.js";
-import type { UnrealMcpConfig } from "../types.js";
+import type { PluginBridgeResponse, UnrealMcpConfig } from "../types.js";
 import { inlineScript } from "../utils/template.js";
+
+/**
+ * Render a plugin bridge response as a tool result.
+ *
+ * The plugin omits `data` when a command fails, so stringifying it
+ * unconditionally yields `undefined` rather than a string, and the whole tool
+ * result then fails MCP schema validation. The caller sees ~80 lines of Zod
+ * complaints instead of the reason the command failed — which the plugin does
+ * report, e.g. "Output pin 'nope' not found on source node. Available: ...".
+ */
+function pluginResult(response: PluginBridgeResponse, indent = false) {
+	if (!response.success) {
+		return {
+			content: [
+				{
+					type: "text" as const,
+					text: JSON.stringify({ error: response.error ?? "Plugin command failed" }),
+				},
+			],
+		};
+	}
+
+	return {
+		content: [
+			{
+				type: "text" as const,
+				text: JSON.stringify(response.data ?? {}, null, indent ? 2 : undefined),
+			},
+		],
+	};
+}
 
 export function registerBlueprintTools(
 	server: McpServer,
@@ -29,7 +60,7 @@ export function registerBlueprintTools(
 					command: "create_blueprint",
 					params: { name, parent_class, path },
 				});
-				return { content: [{ type: "text", text: JSON.stringify(response.data) }] };
+				return pluginResult(response);
 			}
 
 			// Python fallback
@@ -72,7 +103,7 @@ else:
 					command: "add_component",
 					params: { blueprint_path, component_class, component_name },
 				});
-				return { content: [{ type: "text", text: JSON.stringify(response.data) }] };
+				return pluginResult(response);
 			}
 
 			const cname = component_name || component_class.replace("Component", "");
@@ -126,7 +157,7 @@ else:
 					command: "add_variable",
 					params: { blueprint_path, variable_name, variable_type, default_value },
 				});
-				return { content: [{ type: "text", text: JSON.stringify(response.data) }] };
+				return pluginResult(response);
 			}
 
 			const typeMap: Record<string, string> = {
@@ -184,7 +215,7 @@ else:
 					command: "add_node",
 					params: { blueprint_path, node_type, x, y, properties: properties || {} },
 				});
-				return { content: [{ type: "text", text: JSON.stringify(response.data) }] };
+				return pluginResult(response);
 			}
 
 			// Python fallback — limited to basic node types
@@ -221,7 +252,7 @@ else:
 					command: "connect_nodes",
 					params: { blueprint_path, source_node_id, source_pin, target_node_id, target_pin },
 				});
-				return { content: [{ type: "text", text: JSON.stringify(response.data) }] };
+				return pluginResult(response);
 			}
 
 			return {
@@ -253,7 +284,7 @@ else:
 					command: "remove_node",
 					params: { blueprint_path, node_id },
 				});
-				return { content: [{ type: "text", text: JSON.stringify(response.data) }] };
+				return pluginResult(response);
 			}
 
 			return {
@@ -281,7 +312,7 @@ else:
 					command: "list_nodes",
 					params: { blueprint_path },
 				});
-				return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+				return pluginResult(response, true);
 			}
 
 			// Python fallback — graph node enumeration is not available via Python API
@@ -440,7 +471,7 @@ else:
 					command: "add_function",
 					params: { blueprint_path, function_name },
 				});
-				return { content: [{ type: "text", text: JSON.stringify(response.data) }] };
+				return pluginResult(response);
 			}
 
 			const script = inlineScript(

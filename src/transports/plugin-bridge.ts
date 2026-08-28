@@ -89,13 +89,23 @@ export class PluginBridgeClient {
 		}
 
 		await new Promise<void>((resolve, reject) => {
+			let connected = false;
 			const socket = createConnection({ host: this.host, port: this.port }, () => {
+				connected = true;
+				// The 3s budget below is meant to bound *connecting*. Node's
+				// setTimeout is an idle timer that stays armed for the life of the
+				// socket, so leaving it set would tear down a perfectly healthy
+				// connection 3s after the last message and flip _available to false.
+				socket.setTimeout(0);
 				this.socket = socket;
 				this.receiveBuffer = Buffer.alloc(0);
 				resolve();
 			});
 			socket.setTimeout(3000);
 			socket.on("timeout", () => {
+				if (connected) {
+					return;
+				}
 				socket.destroy();
 				reject(new Error("Connection timeout"));
 			});
@@ -255,7 +265,12 @@ export class PluginBridgeClient {
 	 * Automatically reconnects on connection failure (one retry).
 	 */
 	async sendCommand(command: PluginBridgeCommand): Promise<PluginBridgeResponse> {
-		if (!this._available) {
+		// `_available` goes false whenever the socket drops — an editor restart, a
+		// plugin reload — and nothing sets it back except isAvailable(), which only
+		// runs on a status refresh. Without this retry the first call after the
+		// editor comes back reports the plugin as absent even though it is
+		// listening, and the caller is told to go install something already there.
+		if (!this._available && !(await this.isAvailable())) {
 			throw new PluginNotAvailableError();
 		}
 
