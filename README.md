@@ -181,7 +181,24 @@ Place `.unrealmcp.json` in your project directory or home directory:
 
 ### Optional (for Blueprint graph tools)
 
-Install the C++ plugin from `plugin/UnrealMCPBridge/` into your project's `Plugins/` directory. This enables `add_graph_node`, `connect_graph_nodes`, and `remove_graph_node`.
+Copy `plugin/UnrealMCPBridge/` into your project's `Plugins/` directory, add it to the
+`Plugins` array in your `.uproject`, then rebuild the editor target:
+
+```
+"<UE>/Engine/Build/BatchFiles/Build.bat" <Project>Editor Win64 Development -Project="<path>.uproject"
+```
+
+The editor must be closed while building. Requires a C++ project — a Blueprint-only
+project has no editor target to compile the plugin into.
+
+This is what enables `add_graph_node`, `connect_graph_nodes`, `remove_graph_node` and
+`list_graph_nodes`, none of which have a Python fallback: the Blueprint graph API
+(`ubergraph_pages`) is not exposed to Python. The plugin also serves `create_blueprint`,
+`add_blueprint_component`, `add_blueprint_variable` and `add_blueprint_function`, which
+otherwise fall back to Python.
+
+The bridge listens on `127.0.0.1:55557`. Pass `-MCPBridgePort=<n>` on the editor command
+line if you run two editors at once, so the second does not lose the bind race.
 
 ## Development
 

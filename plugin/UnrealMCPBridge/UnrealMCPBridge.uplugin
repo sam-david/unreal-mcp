@@ -1,0 +1,20 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0.0",
+	"FriendlyName": "Unreal MCP Bridge",
+	"Description": "TCP bridge that exposes Blueprint graph editing to the unreal-mcp server. Speaks the length-prefixed JSON protocol expected by PluginBridgeClient on port 55557.",
+	"Category": "Scripting",
+	"CreatedBy": "",
+	"CanContainContent": false,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "UnrealMCPBridge",
+			"Type": "Editor",
+			"LoadingPhase": "PostEngineInit"
+		}
+	]
+}
